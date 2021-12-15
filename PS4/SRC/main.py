@@ -9,6 +9,15 @@ def negative_literal(x):
     return x.replace("-", "") if "-" in x else "-" + x
 
 
+def is_tautology(clause):
+    # sample: clause = ["A", "-A", "B"] = True
+    for literal in clause:
+        if negative_literal(literal) in clause:
+            return True
+
+    return False
+
+
 def negative_alpha(alpha):
     clause = []
 
@@ -28,10 +37,31 @@ def negative_alpha(alpha):
     return clause
 
 
+def standardize_kb(_kb):
+    kb = deepcopy(_kb)
+    new_kb = []
+
+    # remove duplicates and sort literals by alphabet in each clause of KB
+    kb = [
+        sorted(
+            set(clause),
+            key=lambda literal: literal.replace("-", "") if "-" in literal else literal,
+        )
+        for clause in kb
+    ]
+
+    # remove tautology clause in kb and write to new_kb
+    for clause in kb:
+        if not is_tautology(clause):
+            new_kb.extend([clause])
+
+    return new_kb
+
+
 def pl_resolve(clause_x, clause_y):
     resolvent = clause_x + clause_y
 
-    # remove tautology clause
+    # remove duality literals
     # sample: resolvent has both A and -A
     for literal in resolvent:
         if negative_literal(literal) in resolvent:
@@ -39,11 +69,9 @@ def pl_resolve(clause_x, clause_y):
             resolvent.remove(negative_literal(literal))
             break
 
-    # if still have tautology clause then return None
-    # sample: resolvent = ["B", "-B", "C"], this mean B OR -B OR C = TRUE OR C = TRUE
-    for literal in resolvent:
-        if negative_literal(literal) in resolvent:
-            return None
+    # if now resolvent is a tautology then return None
+    if is_tautology(resolvent):
+        return None
 
     # if nothing changed then return None
     if len(resolvent) == len(clause_x) + len(clause_y):
@@ -58,13 +86,13 @@ def pl_resolve(clause_x, clause_y):
     return list(resolvent)
 
 
-def resolve_clause(_kb):
-    kb = deepcopy(_kb)
+def resolve_clause(_clauses):
+    clauses = deepcopy(_clauses)
     new = []
 
-    for clause_x in kb:
-        # copy kb without clause_x
-        clone = deepcopy(kb)
+    for clause_x in clauses:
+        # copy clauses without clause_x
+        clone = deepcopy(clauses)
         clone.remove(clause_x)
         for clause_y in clone:
             # Apply pl_resolve for clause_x and clause_y
@@ -75,7 +103,7 @@ def resolve_clause(_kb):
             isInKB = None
             isInNew = None
             if not isNone:
-                isInKB = resolvent in kb
+                isInKB = resolvent in clauses
                 isInNew = resolvent in new
 
             # if ok then append to new clause else skip
@@ -89,17 +117,13 @@ def pl_resolution(_kb, _alpha, result):
     kb = deepcopy(_kb)
     alpha = deepcopy(_alpha)
 
-    # remove duplicates and sort literals by alphabet in each clause of KB
-    kb = [
-        sorted(
-            set(clause),
-            key=lambda literal: literal.replace("-", "") if "-" in literal else literal,
-        )
-        for clause in kb
-    ]
+    # if alpha is tautology then return True
+    if is_tautology(alpha):
+        result.append("YES")
+        return True
 
-    # Add negative alpha to KB
-    clauses = kb + negative_alpha(alpha)
+    # Add negative alpha to standardize KB
+    clauses = standardize_kb(kb) + negative_alpha(alpha)
 
     while True:
         new = resolve_clause(clauses)
